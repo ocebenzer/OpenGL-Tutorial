@@ -5,28 +5,34 @@ using namespace std;
 
 /* Use glew.h instead of gl.h to get all the GL prototypes declared */
 #include <GL/glew.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 /* Using SDL2 for the base window and OpenGL context init */
 #include <SDL2/SDL.h>
 
 // include, utility functions etc.
 #include "./common/shader_utils.h"
 
+#define PI 3.141592653589f
+
 // global variables
 GLuint program;
 GLuint vbo_triangle;
-GLint attribute_coord2d, attribute_v_color, uniform_fade;
+GLint attribute_coord3d, attribute_v_color, uniform_fade;  /* Global */
+GLint uniform_m_transform;
 
 struct attributes {
-	GLfloat coord2d[2];
+  	GLfloat coord3d[3];
 	GLfloat v_color[3];
 };
 
 bool init_resources() {
 	// vertices
 	struct attributes triangle_attributes[] = {
-		{{ 0.0,  0.8}, {1.0, 1.0, 0.0}},
-		{{-0.8, -0.8}, {0.0, 0.0, 1.0}},
-		{{ 0.8, -0.8}, {1.0, 0.0, 0.0}},
+		{{ 0.0,  0.8, 0.0}, {1.0, 1.0, 0.0}},
+		{{-0.8, -0.8, 0.0}, {0.0, 0.0, 1.0}},
+		{{ 0.8, -0.8, 0.0}, {1.0, 0.0, 0.0}}
 	};
 	glGenBuffers(1, &vbo_triangle);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle);
@@ -52,9 +58,9 @@ bool init_resources() {
 		return false;
 	}
 	
-	const char* attribute_name = "coord2d";
-	attribute_coord2d = glGetAttribLocation(program, attribute_name);
-	if (attribute_coord2d == -1) {
+	const char* attribute_name = "coord3d";
+	attribute_coord3d = glGetAttribLocation(program, attribute_name);
+	if (attribute_coord3d == -1) {
 		cerr << "Could not bind attribute " << attribute_name << endl;
 		return false;
 	}
@@ -65,7 +71,13 @@ bool init_resources() {
 		return false;
 	}
 
-	const char* uniform_name;
+	const char* uniform_name = "m_transform";
+	uniform_m_transform = glGetUniformLocation(program, uniform_name);
+	if (uniform_m_transform == -1) {
+		cerr << "Could not bind uniform " << uniform_name << endl;
+		return false;
+	}
+
 	uniform_name = "fade";
 	uniform_fade = glGetUniformLocation(program, uniform_name);
 	if (uniform_fade == -1) {
@@ -82,15 +94,15 @@ void render(SDL_Window* window) {
 	
 	glUseProgram(program);
 
-	glEnableVertexAttribArray(attribute_coord2d);
+	glEnableVertexAttribArray(attribute_coord3d);
 	glEnableVertexAttribArray(attribute_v_color);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle);
 	glVertexAttribPointer(
-		attribute_coord2d,   // attribute
-		2,                   // number of elements per vertex, here (x,y)
+		attribute_coord3d,   // attribute
+		3,                   // number of elements per vertex, here (x,y,z)
 		GL_FLOAT,            // the type of each element
 		GL_FALSE,            // take our values as-is
-		sizeof(struct attributes), // next coord2d appears every 5 floats
+		sizeof(struct attributes), // next coord3d appears every 6 floats
 		(GLvoid*) 0          // offset of the first element
 	);
 	glVertexAttribPointer(
@@ -98,14 +110,14 @@ void render(SDL_Window* window) {
 		3,                      // number of elements per vertex, here (r,g,b)
 		GL_FLOAT,               // the type of each element
 		GL_FALSE,               // take our values as-is
-		sizeof(struct attributes),    // next color appears every 5 floats
+		sizeof(struct attributes),    // next color appears every 6 floats
 		(GLvoid*) offsetof(struct attributes, v_color)  // offset of first element
 	);
 	
 	/* Push each element in buffer_vertices to the vertex shader */
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	
-	glDisableVertexAttribArray(attribute_coord2d);
+	glDisableVertexAttribArray(attribute_coord3d);
 	glDisableVertexAttribArray(attribute_v_color);
 
 	SDL_GL_SwapWindow(window);
@@ -117,10 +129,20 @@ void free_resources() {
 }
 
 void logic() {
-	// alpha 0->1->0 every 5 seconds
-	float cur_fade = sinf(SDL_GetTicks() / 1000.0 * (2*3.14) / 2) / 2 + 0.5;
+	float movex = sinf(SDL_GetTicks() / 1000.0 * (-2*PI) / 4); // -1<->+1 every 5 seconds
+	float movey = cosf(SDL_GetTicks() / 1000.0 * (2*PI) / 4); // -1<->+1 every 5 seconds
+	float angle = SDL_GetTicks() / 1000.0 * 90;  // 45° per second
+	glm::vec3 axis_z(0, 0, 1);
+	glm::mat4 m_transform = 
+		glm::translate(glm::mat4(1.0f), glm::vec3(movex, movey, 0.0)) *
+		glm::rotate(glm::mat4(1.0f), glm::radians(angle), axis_z) *
+		glm::translate(glm::mat4(1.0f), glm::vec3(0, -1.8, 0));
+	 glUniformMatrix4fv(uniform_m_transform, 1, GL_FALSE, glm::value_ptr(m_transform));
+
+	// alpha 0->1->0 every 2 seconds
+	float cur_fade = sinf(SDL_GetTicks() / 1000.0 * (2*PI) / 2) / 2 + 0.5;
 	glUseProgram(program);
-	glUniform1f(uniform_fade, cur_fade);
+	glUniform1f(uniform_fade, 1);
 }
 
 void mainLoop(SDL_Window* window) {
