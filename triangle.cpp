@@ -132,6 +132,10 @@ int main(int argc, char* argv[]) {
 	if (!init_resources())
 		return EXIT_FAILURE;
 
+	// Enable alpha
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	/* We can display something if everything goes OK */
 	mainLoop(window);
 
