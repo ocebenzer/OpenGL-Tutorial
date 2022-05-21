@@ -13,20 +13,22 @@ using namespace std;
 
 // global variables
 GLuint program;
-GLint attribute_coord2d;
-GLuint vbo_triangle;
+GLuint vbo_triangle, vbo_triangle_colors;
+GLint attribute_coord2d, attribute_v_color;
 
 
 bool init_resources() {
-	GLfloat triangle_vertices[] = {
-	    0.0,  0.8,
-	   -0.8, -0.8,
-	    0.8, -0.8,
+	// vertices
+	GLfloat triangle_attributes[] = {
+		0.0,  0.8,   1.0, 1.0, 0.0,
+		-0.8, -0.8,   0.0, 0.0, 1.0,
+		0.8, -0.8,   1.0, 0.0, 0.0,
 	};
 	glGenBuffers(1, &vbo_triangle);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_vertices), triangle_vertices, GL_STATIC_DRAW);
-	
+	glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_attributes), triangle_attributes, GL_STATIC_DRAW);
+
+	// shaders
 	GLint link_ok = GL_FALSE;
 	
 	GLuint vs, fs;
@@ -34,6 +36,8 @@ bool init_resources() {
 	if ((fs = create_shader("triangle.f.glsl", GL_FRAGMENT_SHADER)) == 0) return false;
 	
 	program = glCreateProgram();
+
+
 	glAttachShader(program, vs);
 	glAttachShader(program, fs);
 	glLinkProgram(program);
@@ -50,6 +54,12 @@ bool init_resources() {
 		cerr << "Could not bind attribute " << attribute_name << endl;
 		return false;
 	}
+	attribute_name = "v_color";
+	attribute_v_color = glGetAttribLocation(program, attribute_name);
+	if (attribute_v_color == -1) {
+		cerr << "Could not bind attribute " << attribute_name << endl;
+		return false;
+	}
 	
 	return true;
 }
@@ -59,22 +69,33 @@ void render(SDL_Window* window) {
 	glClear(GL_COLOR_BUFFER_BIT);
 	
 	glUseProgram(program);
+
 	glEnableVertexAttribArray(attribute_coord2d);
-	/* Describe our vertices array to OpenGL (it can't guess its format automatically) */
+	glEnableVertexAttribArray(attribute_v_color);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle);
 	glVertexAttribPointer(
-		attribute_coord2d, // attribute
-		2,                 // number of elements per vertex, here (x,y)
-		GL_FLOAT,          // the type of each element
-		GL_FALSE,          // take our values as-is
-		0,                 // no extra data between each position
-		0                  // offset of first element
+		attribute_coord2d,   // attribute
+		2,                   // number of elements per vertex, here (x,y)
+		GL_FLOAT,            // the type of each element
+		GL_FALSE,            // take our values as-is
+		5 * sizeof(GLfloat), // next coord2d appears every 5 floats
+		0                    // offset of the first element
 	);
+	glVertexAttribPointer(
+		attribute_v_color,      // attribute
+		3,                      // number of elements per vertex, here (r,g,b)
+		GL_FLOAT,               // the type of each element
+		GL_FALSE,               // take our values as-is
+		5 * sizeof(GLfloat),    // next color appears every 5 floats
+		(GLvoid*) (2 * sizeof(GLfloat))  // offset of first element
+	);
+
 	
 	/* Push each element in buffer_vertices to the vertex shader */
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	
 	glDisableVertexAttribArray(attribute_coord2d);
+	glDisableVertexAttribArray(attribute_v_color);
 	SDL_GL_SwapWindow(window);
 }
 
