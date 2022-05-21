@@ -13,16 +13,20 @@ using namespace std;
 
 // global variables
 GLuint program;
-GLuint vbo_triangle, vbo_triangle_colors;
-GLint attribute_coord2d, attribute_v_color;
+GLuint vbo_triangle;
+GLint attribute_coord2d, attribute_v_color, uniform_fade;
 
+struct attributes {
+	GLfloat coord2d[2];
+	GLfloat v_color[3];
+};
 
 bool init_resources() {
 	// vertices
-	GLfloat triangle_attributes[] = {
-		0.0,  0.8,   1.0, 1.0, 0.0,
-		-0.8, -0.8,   0.0, 0.0, 1.0,
-		0.8, -0.8,   1.0, 0.0, 0.0,
+	struct attributes triangle_attributes[] = {
+		{{ 0.0,  0.8}, {1.0, 1.0, 0.0}},
+		{{-0.8, -0.8}, {0.0, 0.0, 1.0}},
+		{{ 0.8, -0.8}, {1.0, 0.0, 0.0}},
 	};
 	glGenBuffers(1, &vbo_triangle);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle);
@@ -60,6 +64,14 @@ bool init_resources() {
 		cerr << "Could not bind attribute " << attribute_name << endl;
 		return false;
 	}
+
+	const char* uniform_name;
+	uniform_name = "fade";
+	uniform_fade = glGetUniformLocation(program, uniform_name);
+	if (uniform_fade == -1) {
+		cerr << "Could not bind uniform " << uniform_name << endl;
+		return false;
+	}
 	
 	return true;
 }
@@ -78,17 +90,19 @@ void render(SDL_Window* window) {
 		2,                   // number of elements per vertex, here (x,y)
 		GL_FLOAT,            // the type of each element
 		GL_FALSE,            // take our values as-is
-		5 * sizeof(GLfloat), // next coord2d appears every 5 floats
-		0                    // offset of the first element
+		sizeof(struct attributes), // next coord2d appears every 5 floats
+		(GLvoid*) 0          // offset of the first element
 	);
 	glVertexAttribPointer(
 		attribute_v_color,      // attribute
 		3,                      // number of elements per vertex, here (r,g,b)
 		GL_FLOAT,               // the type of each element
 		GL_FALSE,               // take our values as-is
-		5 * sizeof(GLfloat),    // next color appears every 5 floats
-		(GLvoid*) (2 * sizeof(GLfloat))  // offset of first element
+		sizeof(struct attributes),    // next color appears every 5 floats
+		(GLvoid*) offsetof(struct attributes, v_color)  // offset of first element
 	);
+	
+	glUniform1f(uniform_fade, 0.1);
 
 	
 	/* Push each element in buffer_vertices to the vertex shader */
@@ -96,6 +110,7 @@ void render(SDL_Window* window) {
 	
 	glDisableVertexAttribArray(attribute_coord2d);
 	glDisableVertexAttribArray(attribute_v_color);
+
 	SDL_GL_SwapWindow(window);
 }
 
