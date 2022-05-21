@@ -102,9 +102,6 @@ void render(SDL_Window* window) {
 		(GLvoid*) offsetof(struct attributes, v_color)  // offset of first element
 	);
 	
-	glUniform1f(uniform_fade, 0.1);
-
-	
 	/* Push each element in buffer_vertices to the vertex shader */
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	
@@ -119,6 +116,13 @@ void free_resources() {
  	glDeleteBuffers(1, &vbo_triangle);
 }
 
+void logic() {
+	// alpha 0->1->0 every 5 seconds
+	float cur_fade = sinf(SDL_GetTicks() / 1000.0 * (2*3.14) / 2) / 2 + 0.5;
+	glUseProgram(program);
+	glUniform1f(uniform_fade, cur_fade);
+}
+
 void mainLoop(SDL_Window* window) {
 	while (true) {
 		SDL_Event ev;
@@ -126,6 +130,7 @@ void mainLoop(SDL_Window* window) {
 			if (ev.type == SDL_QUIT)
 				return;
 		}
+		logic();
 		render(window);
 	}
 }
