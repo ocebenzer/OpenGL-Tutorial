@@ -80,6 +80,7 @@ void render(SDL_Window* window) {
 
 void free_resources() {
 	glDeleteProgram(program);
+ 	glDeleteBuffers(1, &vbo_triangle);
 }
 
 void mainLoop(SDL_Window* window) {
@@ -96,16 +97,33 @@ void mainLoop(SDL_Window* window) {
 int main(int argc, char* argv[]) {
 	/* SDL-related initialising functions */
 	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window* window = SDL_CreateWindow("My First Triangle",
+	SDL_Window* window = SDL_CreateWindow("My Second Triangle",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		640, 480,
 		SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
-	SDL_GL_CreateContext(window);
+	if (window == NULL) {
+		cerr << "Error: can't create window: " << SDL_GetError() << endl;
+		return EXIT_FAILURE;
+	}
+	
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	//SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+	//SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 1);
+	if (SDL_GL_CreateContext(window) == NULL) {
+		cerr << "Error: SDL_GL_CreateContext: " << SDL_GetError() << endl;
+		return EXIT_FAILURE;
+	}
 
 	/* Extension wrangler initialising */
 	GLenum glew_status = glewInit();
 	if (glew_status != GLEW_OK) {
 		cerr << "Error: glewInit: " << glewGetErrorString(glew_status) << endl;
+		return EXIT_FAILURE;
+	}
+
+	if (!GLEW_VERSION_2_0) {
+		cerr << "Error: your graphic card does not support OpenGL 2.0" << endl;
 		return EXIT_FAILURE;
 	}
 
@@ -122,3 +140,4 @@ int main(int argc, char* argv[]) {
 	free_resources();
 	return EXIT_SUCCESS;
 }
+
