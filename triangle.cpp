@@ -18,7 +18,8 @@ using namespace std;
 
 // global variables
 GLuint program;
-GLuint vbo_triangle;
+GLuint vbo_cube_vertices;
+GLuint ibo_cube_elements;
 GLint attribute_coord3d, attribute_v_color, uniform_fade;  /* Global */
 GLint uniform_m_transform;
 
@@ -28,15 +29,45 @@ struct attributes {
 };
 
 bool init_resources() {
-	// vertices
-	struct attributes triangle_attributes[] = {
-		{{ 0.0,  0.8, 0.0}, {1.0, 1.0, 0.0}},
-		{{-0.8, -0.8, 0.0}, {0.0, 0.0, 1.0}},
-		{{ 0.8, -0.8, 0.0}, {1.0, 0.0, 0.0}}
+	struct attributes cube_vertices[] = {
+		// front
+		{{-1.0, -1.0,  1.0}, {1.0, 0.0, 0.0}},
+		{{1.0, -1.0,  1.0}, {0.0, 1.0, 0.0}},
+		{{1.0,  1.0,  1.0}, {0.0, 0.0, 1.0}},
+		{{-1.0,  1.0,  1.0}, {1.0, 1.0, 1.0}},
+		// back
+		{{-1.0, -1.0, -1.0}, {1.0, 0.0, 0.0}},
+		{{1.0, -1.0, -1.0}, {1.0, 0.0, 0.0}},
+		{{1.0,  1.0, -1.0}, {0.0, 0.0, 1.0}},
+		{{-1.0,  1.0, -1.0}, {1.0, 1.0, 1.0}}
 	};
-	glGenBuffers(1, &vbo_triangle);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_attributes), triangle_attributes, GL_STATIC_DRAW);
+	glGenBuffers(1, &vbo_cube_vertices);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_cube_vertices);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
+	/* init_resources */
+	GLushort cube_elements[] = {
+		// front
+		0, 1, 2,
+		2, 3, 0,
+		// right
+		1, 5, 6,
+		6, 2, 1,
+		// back
+		7, 6, 5,
+		5, 4, 7,
+		// left
+		4, 0, 3,
+		3, 7, 4,
+		// bottom
+		4, 5, 1,
+		1, 0, 4,
+		// top
+		3, 2, 6,
+		6, 7, 3
+	};
+	glGenBuffers(1, &ibo_cube_elements);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_cube_elements);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_elements), cube_elements, GL_STATIC_DRAW);
 
 	// shaders
 	GLint link_ok = GL_FALSE;
@@ -90,13 +121,12 @@ bool init_resources() {
 
 void render(SDL_Window* window) {
 	glClearColor(1.0, 1.0, 1.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 	
 	glUseProgram(program);
-
 	glEnableVertexAttribArray(attribute_coord3d);
-	glEnableVertexAttribArray(attribute_v_color);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_cube_vertices);
 	glVertexAttribPointer(
 		attribute_coord3d,   // attribute
 		3,                   // number of elements per vertex, here (x,y,z)
@@ -105,6 +135,8 @@ void render(SDL_Window* window) {
 		sizeof(struct attributes), // next coord3d appears every 6 floats
 		(GLvoid*) 0          // offset of the first element
 	);
+	glEnableVertexAttribArray(attribute_v_color);
+	glEnableVertexAttribArray(attribute_coord3d);
 	glVertexAttribPointer(
 		attribute_v_color,      // attribute
 		3,                      // number of elements per vertex, here (r,g,b)
@@ -113,19 +145,21 @@ void render(SDL_Window* window) {
 		sizeof(struct attributes),    // next color appears every 6 floats
 		(GLvoid*) offsetof(struct attributes, v_color)  // offset of first element
 	);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_cube_elements);
+	int size;  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+	glDrawElements(GL_TRIANGLES, size/sizeof(GLushort), GL_UNSIGNED_SHORT, 0);
 	
-	/* Push each element in buffer_vertices to the vertex shader */
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-	
-	glDisableVertexAttribArray(attribute_coord3d);
 	glDisableVertexAttribArray(attribute_v_color);
+	glDisableVertexAttribArray(attribute_coord3d);
 
 	SDL_GL_SwapWindow(window);
 }
 
 void free_resources() {
 	glDeleteProgram(program);
- 	glDeleteBuffers(1, &vbo_triangle);
+ 	glDeleteBuffers(1, &vbo_cube_vertices);
+ 	glDeleteBuffers(1, &ibo_cube_elements);
 }
 
 void logic() {
@@ -195,6 +229,8 @@ int main(int argc, char* argv[]) {
 	if (!init_resources())
 		return EXIT_FAILURE;
 
+	glEnable(GL_DEPTH_TEST);
+	//glDepthFunc(GL_LESS);
 	// Enable alpha
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
