@@ -1,5 +1,5 @@
-varying vec3 f_color;
+uniform vec4 rgba;
 
 void main(void) {
-  gl_FragColor = vec4(f_color.xyz, 1.0);
+  gl_FragColor = rgba;
 }

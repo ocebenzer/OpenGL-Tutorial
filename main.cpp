@@ -17,25 +17,25 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "./common/shader_utils.h"
 #include "teapot.cpp"
+#include "movement.cpp"
 
 int screen_width=800, screen_height=600;
-GLuint vbo_teapot_vertices, vbo_teapot_colors, ibo_teapot_elements,
-  vbo_teapot_cp_vertices, vbo_teapot_cp_colors, ibo_teapot_cp_elements;
+GLuint vbo_teapot_vertices, ibo_teapot_elements,
+  vbo_teapot_cp_vertices, ibo_teapot_cp_elements;
 GLuint program;
-GLint attribute_coord3d, attribute_v_color;
-GLint uniform_mvp;
+GLint attribute_coord3d;
+GLint uniform_mvp, uniform_rgba;
 
-int init_resources()
-{
+int time, dt;
+
+glm::vec4 rgba(0.3, 0.3, 0.3, 1.0);
+
+int init_resources() {
   build_teapot();
 
   glGenBuffers(1, &vbo_teapot_vertices);
   glBindBuffer(GL_ARRAY_BUFFER, vbo_teapot_vertices);
   glBufferData(GL_ARRAY_BUFFER, sizeof(teapot_vertices), teapot_vertices, GL_STATIC_DRAW);
-  
-  glGenBuffers(1, &vbo_teapot_colors);
-  glBindBuffer(GL_ARRAY_BUFFER, vbo_teapot_colors);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(teapot_colors), teapot_colors, GL_STATIC_DRAW);
 
   glGenBuffers(1, &ibo_teapot_elements);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_teapot_elements);
@@ -44,10 +44,6 @@ int init_resources()
   glGenBuffers(1, &vbo_teapot_cp_vertices);
   glBindBuffer(GL_ARRAY_BUFFER, vbo_teapot_cp_vertices);
   glBufferData(GL_ARRAY_BUFFER, sizeof(teapot_cp_vertices), teapot_cp_vertices, GL_STATIC_DRAW);
-  
-  glGenBuffers(1, &vbo_teapot_cp_colors);
-  glBindBuffer(GL_ARRAY_BUFFER, vbo_teapot_cp_colors);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(teapot_cp_colors), teapot_cp_colors, GL_STATIC_DRAW);
 
   glGenBuffers(1, &ibo_teapot_cp_elements);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_teapot_cp_elements);
@@ -85,9 +81,9 @@ int init_resources()
     fprintf(stderr, "Could not bind uniform %s\n", uniform_name);
     return 0;
   }
-  attribute_name = "v_color";
-  attribute_v_color = glGetUniformLocation(program, attribute_name);
-  if (attribute_v_color == -1) {
+  attribute_name = "rgba";
+  uniform_rgba = glGetUniformLocation(program, attribute_name);
+  if (uniform_rgba == -1) {
     fprintf(stderr, "Could not bind attribute %s\n", attribute_name);
     return 0;
   }
@@ -96,26 +92,25 @@ int init_resources()
 }
 
 void onIdle() {
-  float angle = glutGet(GLUT_ELAPSED_TIME) / 1000.0 * glm::radians(15.0);  // 15° per second
-  glm::mat4 anim =
-    glm::rotate(glm::mat4(1.0f), 1*angle, glm::vec3(1, 0, 0)) *
-    glm::rotate(glm::mat4(1.0f), 2*angle, glm::vec3(0, 1, 0)) *
-    glm::rotate(glm::mat4(1.0f), 3*angle, glm::vec3(0, 0, 1)) *
-    glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0, -1.5));
-
   glm::mat4 model = glm::mat4(1.0f);
-  glm::mat4 view = glm::lookAt(glm::vec3(0.0, 0.0, 8.0), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+  glm::mat4 view = glm::lookAt(camera, camera+direction, up);
   glm::mat4 projection = glm::perspective(45.0f, 1.0f*screen_width/screen_height, 0.1f, 10.0f);
 
-  glm::mat4 mvp = projection * view * model * anim;
+  int currentTime = glutGet(GLUT_ELAPSED_TIME);
+  dt = currentTime - time;
+  time = currentTime;
+
+  setCamera(dt);
+
+  glm::mat4 mvp = projection * view * model;
 
   glUseProgram(program);
   glUniformMatrix4fv(uniform_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
+  glUniform4fv(uniform_rgba, 1, glm::value_ptr(rgba));
   glutPostRedisplay();
 }
 
-void onDisplay()
-{
+void onDisplay() {
   glClearColor(1.0, 1.0, 1.0, 1.0);
   glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
@@ -132,35 +127,13 @@ void onDisplay()
     0,                 // no extra data between each position
     0                  // offset of first element
   );
-  glEnableVertexAttribArray(attribute_v_color);
-  // Describe our vertices array to OpenGL (it can't guess its format automatically)
-  glBindBuffer(GL_ARRAY_BUFFER, vbo_teapot_colors);
-  glVertexAttribPointer(
-    attribute_v_color, // attribute
-    3,                 // number of elements per vertex, here (x,y,z)
-    GL_FLOAT,          // the type of each element
-    GL_FALSE,          // take our values as-is
-    0,                 // no extra data between each position
-    0                  // offset of first element
-  );
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_teapot_elements);
   glDrawElements(GL_TRIANGLES, sizeof(teapot_elements)/sizeof(teapot_elements[0]), GL_UNSIGNED_SHORT, 0);
-
 
   // Draw Control points
   glBindBuffer(GL_ARRAY_BUFFER, vbo_teapot_cp_vertices);
   glVertexAttribPointer(
     attribute_coord3d, // attribute
-    3,                 // number of elements per vertex, here (x,y,z)
-    GL_FLOAT,          // the type of each element
-    GL_FALSE,          // take our values as-is
-    0,                 // no extra data between each position
-    0                  // offset of first element
-  );
-  // Describe our vertices array to OpenGL (it can't guess its format automatically)
-  glBindBuffer(GL_ARRAY_BUFFER, vbo_teapot_cp_colors);
-  glVertexAttribPointer(
-    attribute_v_color, // attribute
     3,                 // number of elements per vertex, here (x,y,z)
     GL_FLOAT,          // the type of each element
     GL_FALSE,          // take our values as-is
@@ -174,7 +147,6 @@ void onDisplay()
       glDrawElements(GL_LINE_LOOP, ORDER+1, GL_UNSIGNED_SHORT, (GLvoid*)offset);
 
   glDisableVertexAttribArray(attribute_coord3d);
-  glDisableVertexAttribArray(attribute_v_color);
   glutSwapBuffers();
 }
 
@@ -184,14 +156,11 @@ void onReshape(int width, int height) {
   glViewport(0, 0, screen_width, screen_height);
 }
 
-void free_resources()
-{
+void free_resources() {
   glDeleteProgram(program);
   glDeleteBuffers(1, &vbo_teapot_vertices);
-  glDeleteBuffers(1, &vbo_teapot_colors);
   glDeleteBuffers(1, &ibo_teapot_elements);
   glDeleteBuffers(1, &vbo_teapot_cp_vertices);
-  glDeleteBuffers(1, &vbo_teapot_cp_colors);
   glDeleteBuffers(1, &ibo_teapot_cp_elements);
 }
 
@@ -201,7 +170,7 @@ int main(int argc, char* argv[]) {
   glutInitContextVersion(2,0);
   glutInitDisplayMode(GLUT_RGBA|GLUT_ALPHA|GLUT_DOUBLE|GLUT_DEPTH);
   glutInitWindowSize(screen_width, screen_height);
-  glutCreateWindow("My Rotating Teapot");
+  glutCreateWindow("My teapot w/ movement");
 
   GLenum glew_status = glewInit();
   if (glew_status != GLEW_OK) {
@@ -218,6 +187,8 @@ int main(int argc, char* argv[]) {
     glutDisplayFunc(onDisplay);
     glutReshapeFunc(onReshape);
     glutIdleFunc(onIdle);
+    glutKeyboardFunc(onKeyboard);
+    glutKeyboardUpFunc(onKeyboardUp);
     glEnable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     //glDepthFunc(GL_LESS);

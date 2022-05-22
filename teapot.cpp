@@ -344,10 +344,8 @@ GLushort teapot_patches[][ORDER+1][ORDER+1] = {
 #define RESU 10
 #define RESV 10
 struct vertex teapot_vertices[TEAPOT_NB_PATCHES * RESU*RESV];
-GLfloat teapot_colors[TEAPOT_NB_PATCHES * RESU*RESV * 3];
 GLushort teapot_elements[TEAPOT_NB_PATCHES * (RESU-1)*(RESV-1) * 2*3];
 
-GLfloat teapot_cp_colors[269*3];
 GLushort teapot_cp_elements[TEAPOT_NB_PATCHES][ORDER+1][ORDER+1];
 
 int factorial(int n) {
@@ -397,9 +395,6 @@ void build_teapot() {
       for (int rv = 0; rv <= RESV-1; rv++) {
 	float v = 1.0 * rv / (RESV-1);
 	teapot_vertices[p*RESU*RESV + ru*RESV + rv] = compute_position(control_points_k, u, v);
-	teapot_colors[p*RESU*RESV*3 + ru*RESV*3 + rv*3 + 0] = 1.0 * p / TEAPOT_NB_PATCHES;
-	teapot_colors[p*RESU*RESV*3 + ru*RESV*3 + rv*3 + 1] = 1.0 * p / TEAPOT_NB_PATCHES;
-	teapot_colors[p*RESU*RESV*3 + ru*RESV*3 + rv*3 + 2] = 0.8;
       }
     }
   }
@@ -419,11 +414,4 @@ void build_teapot() {
 	teapot_elements[n] = p*RESU*RESV + (ru+1)*RESV +  rv   ; n++;
 	teapot_elements[n] = p*RESU*RESV +  ru   *RESV +  rv   ; n++;
       }
-
-  // Control points elements for debugging
-  memset(teapot_cp_colors, 0, sizeof(teapot_cp_colors)); // black
-  for (int p = 0; p < TEAPOT_NB_PATCHES; p++)
-    for (int i = 0; i < (ORDER+1); i++)
-      for (int j = 0; j < (ORDER+1); j++)
-	teapot_cp_elements[p][i][j] = teapot_patches[p][i][j] - 1;
 }
