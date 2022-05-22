@@ -17,7 +17,9 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "./common/shader_utils.h"
 #include "teapot.cpp"
-#include "movement.cpp"
+#include "camera.cpp"
+
+#define PI 3.1415926535f
 
 int screen_width=800, screen_height=600;
 GLuint vbo_teapot_vertices, ibo_teapot_elements,
@@ -98,7 +100,7 @@ void onIdle() {
 
   setCamera(dt);
 
-  glm::mat4 model = glm::mat4(1.0f);
+  glm::mat4 model = glm::rotate(glm::mat4(1.0f), PI/2, glm::vec3(-1.0f, 0.0f, 0.0f));
   glm::mat4 view = glm::lookAt(camera, direction+camera, up);
   glm::mat4 projection = glm::perspective(45.0f, 1.0f*screen_width/screen_height, 0.1f, 10.0f);
 
@@ -191,6 +193,7 @@ int main(int argc, char* argv[]) {
     glutKeyboardUpFunc(onKeyboardUp);
     glutSpecialFunc(onSpecial);
     glutSpecialUpFunc(onSpecialUp);
+    glFrustum(-100, 100, -100, 100, -100, 100);
     glEnable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     //glDepthFunc(GL_LESS);
