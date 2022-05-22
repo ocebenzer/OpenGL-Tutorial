@@ -1,9 +1,7 @@
-CPPFLAGS=$(shell sdl2-config --cflags) $(shell $(PKG_CONFIG) SDL2_image --cflags) $(EXTRA_CPPFLAGS)
-LDLIBS=$(shell sdl2-config --libs) $(shell $(PKG_CONFIG) SDL2_image --libs) -lGLEW $(EXTRA_LDLIBS)
-EXTRA_LDLIBS?=-lGL
-PKG_CONFIG?=pkg-config
+CXXFLAGS=-ggdb
+LDLIBS=-lglut -lGLEW -lGL -lm -lstdc++
 all: main
 clean:
-	rm -f *.o opengl
-main: ./common/shader_utils.o
+	rm -f *.o main
+main: ./common/shader_utils.o main.o
 .PHONY: all clean
