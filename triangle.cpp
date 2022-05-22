@@ -17,11 +17,14 @@ using namespace std;
 #define PI 3.141592653589f
 
 // global variables
+int screen_width=800, screen_height=600;
 GLuint program;
 GLuint vbo_cube_vertices;
 GLuint ibo_cube_elements;
 GLint attribute_coord3d, attribute_v_color, uniform_fade;  /* Global */
 GLint uniform_m_transform;
+GLint uniform_mvp;
+
 
 struct attributes {
   	GLfloat coord3d[3];
@@ -102,11 +105,12 @@ bool init_resources() {
 		return false;
 	}
 
-	const char* uniform_name = "m_transform";
-	uniform_m_transform = glGetUniformLocation(program, uniform_name);
-	if (uniform_m_transform == -1) {
-		cerr << "Could not bind uniform " << uniform_name << endl;
-		return false;
+	const char* uniform_name;
+	uniform_name = "mvp";
+	uniform_mvp = glGetUniformLocation(program, uniform_name);
+	if (uniform_mvp == -1) {
+		fprintf(stderr, "Could not bind uniform %s\n", uniform_name);
+		return 0;
 	}
 
 	uniform_name = "fade";
@@ -156,22 +160,56 @@ void render(SDL_Window* window) {
 	SDL_GL_SwapWindow(window);
 }
 
+void onResize(int width, int height) {
+  screen_width = width;
+  screen_height = height;
+  glViewport(0, 0, screen_width, screen_height);
+}
+
 void free_resources() {
 	glDeleteProgram(program);
  	glDeleteBuffers(1, &vbo_cube_vertices);
  	glDeleteBuffers(1, &ibo_cube_elements);
 }
 
+float aspectaxis() {
+	float outputzoom = 1.0f;
+	float aspectorigin = 16.0f / 9.0f;
+	int aspectconstraint = 1;
+	switch (aspectconstraint) {
+		case 1:
+			if ((screen_width / screen_height) < aspectorigin) {
+				outputzoom *= (((float)screen_width / screen_height) / aspectorigin);
+			}
+			else {
+				outputzoom *= ((float)aspectorigin / aspectorigin);
+			}
+		break;
+		case 2:
+			outputzoom *= (((float)screen_width / screen_height) / aspectorigin);
+		break;
+		default:
+			outputzoom *= ((float)aspectorigin / aspectorigin);
+	}
+	return outputzoom;
+}
+
+float recalculatefov() {
+	return 2.0f * glm::atan(glm::tan(glm::radians(45.0f / 2.0f)) / aspectaxis());
+}
+
 void logic() {
-	float movex = sinf(SDL_GetTicks() / 1000.0 * (-2*PI) / 4); // -1<->+1 every 5 seconds
-	float movey = cosf(SDL_GetTicks() / 1000.0 * (2*PI) / 4); // -1<->+1 every 5 seconds
-	float angle = SDL_GetTicks() / 1000.0 * 90;  // 45° per second
-	glm::vec3 axis_z(0, 0, 1);
-	glm::mat4 m_transform = 
-		glm::translate(glm::mat4(1.0f), glm::vec3(movex, movey, 0.0)) *
-		glm::rotate(glm::mat4(1.0f), glm::radians(angle), axis_z) *
-		glm::translate(glm::mat4(1.0f), glm::vec3(0, -1.8, 0));
-	 glUniformMatrix4fv(uniform_m_transform, 1, GL_FALSE, glm::value_ptr(m_transform));
+	// mvp projection matrix
+	glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0, -4.0));
+	glm::mat4 view = glm::lookAt(glm::vec3(0.0, 2.0, 0.0), glm::vec3(0.0, 0.0, -4.0), glm::vec3(0.0, 1.0, 0.0));
+	glm::mat4 projection = glm::perspective(recalculatefov(), 1.0f * screen_width / screen_height, 0.1f, 10.0f);
+
+	float angle = SDL_GetTicks() / 1000.0 * 45;  // 45° per second
+	glm::vec3 axis_y(0, 1, 0);
+	glm::mat4 anim = glm::rotate(glm::mat4(1.0f), glm::radians(angle), axis_y);
+
+	glm::mat4 mvp = projection * view * model * anim;
+  	glUniformMatrix4fv(uniform_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
 
 	// alpha 0->1->0 every 2 seconds
 	float cur_fade = sinf(SDL_GetTicks() / 1000.0 * (2*PI) / 2) / 2 + 0.5;
@@ -183,6 +221,8 @@ void mainLoop(SDL_Window* window) {
 	while (true) {
 		SDL_Event ev;
 		while (SDL_PollEvent(&ev)) {
+			if (ev.type == SDL_WINDOWEVENT && ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
+				onResize(ev.window.data1, ev.window.data2);
 			if (ev.type == SDL_QUIT)
 				return;
 		}
@@ -194,15 +234,15 @@ void mainLoop(SDL_Window* window) {
 int main(int argc, char* argv[]) {
 	/* SDL-related initialising functions */
 	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window* window = SDL_CreateWindow("My Second Triangle",
+	SDL_Window* window = SDL_CreateWindow("My Textured Cube",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		640, 480,
+		screen_width, screen_height,
 		SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
 	if (window == NULL) {
 		cerr << "Error: can't create window: " << SDL_GetError() << endl;
 		return EXIT_FAILURE;
 	}
-	
+
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 	//SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 	//SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
