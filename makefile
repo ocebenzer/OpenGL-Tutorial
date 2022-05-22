@@ -1,7 +1,3 @@
-CXXFLAGS=-ggdb
-LDLIBS=-lglut -lGLEW -lGL -lm -lstdc++
-all: main
-clean:
-	rm -f *.o main
-main: ./common/shader_utils.o main.o
-.PHONY: all clean
+all:
+	gcc -c main.cpp -o main.o
+	cc   main.o common/shader_utils.o  -lglut -lGLEW -lGL -lm -lstdc++ -o main

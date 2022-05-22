@@ -1,5 +1,7 @@
 #include <glm/glm.hpp>
+#include "glm/gtc/matrix_transform.hpp"
 #include <GL/freeglut.h>
+#include <iostream>
 
 // will be defined later
 const glm::vec3 INITIAL_CAMERA = glm::vec3(0.0f, 0.0, -6.0f);
@@ -11,12 +13,12 @@ glm::vec3 direction(INITIAL_DIRECTION);
 glm::vec3 up(INITIAL_UP);
 
 struct movement {
-    short move = 0;
-    short sidemove = 0;
-    short fly = 0;
-    short rotate = 0;
-    short cam_up = 0;
-    short cam_right = 0;
+    float move = 0;
+    float sidemove = 0;
+    float fly = 0;
+    float rotate = 0;
+    float cam_up = 0;
+    float cam_right = 0;
 };
 
 struct movement move;
@@ -38,6 +40,9 @@ void onKeyboard(unsigned char key, int x, int y) {
 		return;
     case 'q':
 		move.rotate--;
+		return;
+    case 'e':
+		move.rotate++;
 		return;
     case ' ':
         move.fly++;
@@ -76,6 +81,9 @@ void onKeyboardUp(unsigned char key, int x, int y) {
     case 'q':
 		move.rotate++;
 		return;
+    case 'e':
+      move.rotate--;
+      return;
     case ' ':
         move.fly--;
         return;
@@ -101,6 +109,10 @@ void onSpecial(int key, int x, int y) {
         case GLUT_KEY_RIGHT:
             move.cam_right++;
             return;
+        case GLUT_KEY_CTRL_L:
+        case GLUT_KEY_SHIFT_L:
+            move.fly--;
+            return;
         default:
             return;
     }
@@ -120,19 +132,40 @@ void onSpecialUp(int key, int x, int y) {
         case GLUT_KEY_RIGHT:
             move.cam_right--;
             return;
+        case GLUT_KEY_CTRL_L:
+        case GLUT_KEY_SHIFT_L:
+            move.fly++;
+            return;
         default:
             return;
     }
 }
 
 void setCamera(int dt) {
-	glm::mat4 transformPos(1.0f);
-	glm::mat4 transformTarget(1.0f);
+	glm::mat4 transformCamera(1.0f);
+	glm::mat4 transformDirection(1.0f);
 	glm::mat4 transformUp(1.0f);
 
-	glm::vec4 cameraPos4(camera, 1.0f);
-	glm::vec4 cameraTarget4(direction, 1.0f);
-	glm::vec4 cameraUp4(up, 1.0f);
-
 	glm::vec3 cameraNormal = glm::cross(direction, up);
+
+  // forward-backward
+  transformCamera = glm::translate(transformCamera, move.move*direction*0.5f);
+  // right-left
+  transformCamera = glm::translate(transformCamera, move.sidemove*cameraNormal*0.5f);
+  // up-down
+  transformCamera = glm::translate(transformCamera, move.fly*up*0.3f);
+
+  // clk. ctr-clk . rotation
+  transformUp = glm::rotate(transformUp, move.rotate*0.1f, direction);
+
+  // camera movement - left&right
+  transformDirection = glm::rotate(transformDirection, move.cam_right*-0.1f, up);
+
+  // camera movement - up&down
+  transformDirection = glm::rotate(transformDirection, move.cam_up*0.1f, cameraNormal);
+  transformUp = glm::rotate(transformUp, move.cam_up*0.1f, cameraNormal);
+
+	camera = transformCamera * glm::vec4(camera, 1.0f);
+	direction = transformDirection * glm::vec4(direction, 1.0f);
+	up = transformUp * glm::vec4(up, 1.0f);
 }

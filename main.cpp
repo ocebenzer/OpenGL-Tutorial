@@ -26,7 +26,7 @@ GLuint program;
 GLint attribute_coord3d;
 GLint uniform_mvp, uniform_rgba;
 
-int time, dt;
+int currentTime, dt;
 
 glm::vec4 rgba(0.3, 0.3, 0.3, 1.0);
 
@@ -92,15 +92,15 @@ int init_resources() {
 }
 
 void onIdle() {
-  glm::mat4 model = glm::mat4(1.0f);
-  glm::mat4 view = glm::lookAt(camera, camera+direction, up);
-  glm::mat4 projection = glm::perspective(45.0f, 1.0f*screen_width/screen_height, 0.1f, 10.0f);
-
   int currentTime = glutGet(GLUT_ELAPSED_TIME);
-  dt = currentTime - time;
-  time = currentTime;
+  dt = currentTime - currentTime;
+  currentTime = currentTime;
 
   setCamera(dt);
+
+  glm::mat4 model = glm::mat4(1.0f);
+  glm::mat4 view = glm::lookAt(camera, direction+camera, up);
+  glm::mat4 projection = glm::perspective(45.0f, 1.0f*screen_width/screen_height, 0.1f, 10.0f);
 
   glm::mat4 mvp = projection * view * model;
 
@@ -189,6 +189,8 @@ int main(int argc, char* argv[]) {
     glutIdleFunc(onIdle);
     glutKeyboardFunc(onKeyboard);
     glutKeyboardUpFunc(onKeyboardUp);
+    glutSpecialFunc(onSpecial);
+    glutSpecialUpFunc(onSpecialUp);
     glEnable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     //glDepthFunc(GL_LESS);
