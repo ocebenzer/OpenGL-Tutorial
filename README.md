@@ -1,4 +1,4 @@
-## cmpe460 project3 OmerBenzer
+## OpenGL projects
 
 First of all, I'd like to point out that this project is done by referencing the tutorials at: https://en.wikibooks.org/wiki/OpenGL_Programming#The_basics_arc
 
