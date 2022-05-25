@@ -303,9 +303,9 @@ struct vertex teapot_cp_vertices[] = {
   {  0.728 ,   1.3   ,  2.4     },
   {  1.3   ,   0.728 ,  2.4     },
 };
-#define TEAPOT_NB_PATCHES 28
-#define ORDER 3
-GLushort teapot_patches[][ORDER+1][ORDER+1] = {
+
+#define TEAPOT_NB_PATCHES 28 // given data has 28 patches
+GLushort teapot_patches[TEAPOT_NB_PATCHES][4][4] = {
   // rim
   { {   1,   2,   3,   4 }, {   5,   6,   7,   8 }, {   9,  10,  11,  12 }, {  13,  14,  15,  16, } },
   { {   4,  17,  18,  19 }, {   8,  20,  21,  22 }, {  12,  23,  24,  25 }, {  16,  26,  27,  28, } },
@@ -341,77 +341,79 @@ GLushort teapot_patches[][ORDER+1][ORDER+1] = {
   { { 229, 232, 233, 212 }, { 257, 264, 265, 234 }, { 260, 266, 267, 238 }, { 263, 268, 269, 242, } },
   // no bottom!
 };
-#define RESU 10
-#define RESV 10
-struct vertex teapot_vertices[TEAPOT_NB_PATCHES * RESU*RESV];
-GLushort teapot_elements[TEAPOT_NB_PATCHES * (RESU-1)*(RESV-1) * 2*3];
 
-GLushort teapot_cp_elements[TEAPOT_NB_PATCHES][ORDER+1][ORDER+1];
+const int resolution = 10;
 
-int factorial(int n) {
-  assert(n >= 0);
-  int result = 1;
-  for (int i = n; i > 1; i--)
-    result *= i;
-  return result;
+// store all vertices of the teapot after interpolating the patches
+// each patch is divided into a resolution*resolution grid
+struct vertex teapot_vertices[TEAPOT_NB_PATCHES * resolution * resolution];
+
+// final polygons will be stored here
+// the resolution*resolution grid gives (resolution-1)*(resolution-1)
+GLushort teapot_elements[TEAPOT_NB_PATCHES * (resolution-1) * (resolution-1) * 2*3];
+
+// (3 over n) * t^n * (1-t)^(3-n)
+float bernstein_3(float t, int n) {
+    static const float binomial_coefficients_3[] = {1, 3, 3, 1};
+    return binomial_coefficients_3[n] * powf(t, n) * powf(1-t, 3-n);
 }
 
-float binomial_coefficient(int i, int n) {
-  assert(i >= 0); assert(n >= 0);
-  return 1.0f * factorial(n) / (factorial(i) * factorial(n-i));
-}
-
-float bernstein_polynomial(int i, int n, float u) {
-  return binomial_coefficient(i, n) * powf(u, i) * powf(1-u, n-i);
-}
-
-struct vertex compute_position(struct vertex control_points_k[][ORDER+1], float u, float v) {
-  struct vertex result = { 0.0, 0.0, 0.0 };
-  for (int i = 0; i <= ORDER; i++) {
-    float poly_i = bernstein_polynomial(i, ORDER, u);
-    for (int j = 0; j <= ORDER; j++) {
-      float poly_j = bernstein_polynomial(j, ORDER, v);
-      result.x += poly_i * poly_j * control_points_k[i][j].x;
-      result.y += poly_i * poly_j * control_points_k[i][j].y;
-      result.z += poly_i * poly_j * control_points_k[i][j].z;
+// SUM_3toi (SUM_3toj (bernstein3_i(u) * bernstein3_j(v) * control point))
+struct vertex compute_position(struct vertex control_points_k[][4], float u, float v) {
+    struct vertex result = { 0.0, 0.0, 0.0 };
+    for (int i = 0; i < 4; i++) {
+        float poly_i = bernstein_3(u, i);
+        for (int j = 0; j < 4; j++) {
+            float poly_j = bernstein_3(v, j);
+            result.x += poly_i * poly_j * control_points_k[i][j].x;
+            result.y += poly_i * poly_j * control_points_k[i][j].y;
+            result.z += poly_i * poly_j * control_points_k[i][j].z;
+        }
     }
-  }
-  return result;
+    return result;
 }
 
-void build_control_points_k(int p, struct vertex control_points_k[][ORDER+1]) {
-  for (int i = 0; i <= ORDER; i++)
-    for (int j = 0; j <= ORDER; j++)
-      control_points_k[i][j] = teapot_cp_vertices[teapot_patches[p][i][j] - 1];
+// build the control points of one patch
+// the teapot patches are all defined as 4 surcafes, each surface has 4 control points
+void build_control_points_k(int p, struct vertex control_points_k[][4]) {
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++)
+            control_points_k[i][j] = teapot_cp_vertices[teapot_patches[p][i][j] - 1];
 }
 
 void build_teapot() {
-  // Vertices
-  for (int p = 0; p < TEAPOT_NB_PATCHES; p++) {
-    struct vertex control_points_k[ORDER+1][ORDER+1];
-    build_control_points_k(p, control_points_k);
-    for (int ru = 0; ru <= RESU-1; ru++) {
-      float u = 1.0 * ru / (RESU-1);
-      for (int rv = 0; rv <= RESV-1; rv++) {
-	float v = 1.0 * rv / (RESV-1);
-	teapot_vertices[p*RESU*RESV + ru*RESV + rv] = compute_position(control_points_k, u, v);
-      }
+    // calculate all vertices over the teapot
+    for (int p = 0; p < TEAPOT_NB_PATCHES; p++) {
+        struct vertex control_points_k[4][4];
+        build_control_points_k(p, control_points_k);
+        // interpolate surfaces' vertices using control points
+        for (int ru = 0; ru <= resolution-1; ru++) {
+            float du = 1.0 * ru / (resolution-1);
+            for (int rv = 0; rv <= resolution-1; rv++) {
+                float dv = 1.0 * rv / (resolution-1);
+                teapot_vertices[p*resolution*resolution + ru*resolution + rv] = compute_position(control_points_k, du, dv);
+            }
+        }
     }
-  }
 
-  // Elements
-  int n = 0;
-  for (int p = 0; p < TEAPOT_NB_PATCHES; p++)
-    for (int ru = 0; ru < RESU-1; ru++)
-      for (int rv = 0; rv < RESV-1; rv++) {
-	// 1 square ABCD = 2 triangles ABC + CDA
-	// ABC
-	teapot_elements[n] = p*RESU*RESV +  ru   *RESV +  rv   ; n++;
-	teapot_elements[n] = p*RESU*RESV +  ru   *RESV + (rv+1); n++;
-	teapot_elements[n] = p*RESU*RESV + (ru+1)*RESV + (rv+1); n++;
-	// CDA
-	teapot_elements[n] = p*RESU*RESV + (ru+1)*RESV + (rv+1); n++;
-	teapot_elements[n] = p*RESU*RESV + (ru+1)*RESV +  rv   ; n++;
-	teapot_elements[n] = p*RESU*RESV +  ru   *RESV +  rv   ; n++;
-      }
+    // calculate all poigons over the teapot
+    int n = 0;
+    for (int p = 0; p < TEAPOT_NB_PATCHES; p++)
+        for (int ru = 0; ru < resolution-1; ru++)
+            for (int rv = 0; rv < resolution-1; rv++) {
+                // one part of the patch has 4 verties
+                // calculate the indexes of vertices and append polygons to the teapot_elements[]
+                int v1 = p*resolution*resolution + ru *resolution + rv;
+                int v2 = p*resolution*resolution + ru *resolution + rv+1;
+                int v3 = p*resolution*resolution + (ru+1)*resolution + rv+1;
+                int v4 = p*resolution*resolution + (ru+1)*resolution + rv;
+
+                teapot_elements[n++] = v1;
+                teapot_elements[n++] = v2;
+                teapot_elements[n++] = v3;
+
+                teapot_elements[n++] = v3;
+                teapot_elements[n++] = v4;
+                teapot_elements[n++] = v1;
+            }
 }

@@ -25,74 +25,74 @@ struct movement move;
 
 
 void onKeyboard(unsigned char key, int x, int y) {
-  switch(key) {
-    case 'w':
-        move.move++;
-        return;
-    case 'a':
-		move.sidemove--;
-		return;
-    case 's':
-		move.move--;
-		return;
-    case 'd':
-		move.sidemove++;
-		return;
-    case 'q':
-		move.rotate--;
-		return;
-    case 'e':
-		move.rotate++;
-		return;
-    case ' ':
-        move.fly++;
-        return;
-    case 'c':
-        move.fly--;
-        return;
-    // special keys
-    case 'x':
-        glutLeaveMainLoop();
-        return;
-	case 'r':
-		camera = INITIAL_CAMERA;
-		direction = INITIAL_DIRECTION;
-		up = INITIAL_UP;
-		return;
-    default:
-        return;
-  }
+    switch(key) {
+        case 'w':
+            move.move++;
+            return;
+        case 'a':
+            move.sidemove--;
+            return;
+        case 's':
+            move.move--;
+            return;
+        case 'd':
+            move.sidemove++;
+            return;
+        case 'q':
+            move.rotate--;
+            return;
+        case 'e':
+            move.rotate++;
+            return;
+        case ' ':
+            move.fly++;
+            return;
+        case 'c':
+            move.fly--;
+            return;
+        // special keys
+        case 'x':
+            glutLeaveMainLoop();
+            return;
+        case 'r':
+            camera = INITIAL_CAMERA;
+            direction = INITIAL_DIRECTION;
+            up = INITIAL_UP;
+            return;
+        default:
+            return;
+    }
 }
 
 void onKeyboardUp(unsigned char key, int x, int y) {
-  switch(key) {
-    case 'w':
-        move.move--;
+    switch(key) {
+        case 'w':
+            move.move--;
+            return;
+        case 'a':
+            move.sidemove++;
+            return;
+        case 's':
+            move.move++;
+            return;
+        case 'd':
+            move.sidemove--;
+            return;
+        case 'q':
+            move.rotate++;
+            return;
+        case 'e':
+        move.rotate--;
         return;
-    case 'a':
-		move.sidemove++;
-		return;
-    case 's':
-		move.move++;
-		return;
-    case 'd':
-		move.sidemove--;
-		return;
-    case 'q':
-		move.rotate++;
-		return;
-    case 'e':
-      move.rotate--;
-      return;
-    case ' ':
-        move.fly--;
-        return;
-    case 'c':
-        move.fly++;
-        return;
-    default:
-        return;
-  }
+        case ' ':
+            move.fly--;
+            return;
+        case 'c':
+            move.fly++;
+            return;
+        default:
+            return;
+    }
 }
 
 void onSpecial(int key, int x, int y) {
@@ -148,23 +148,24 @@ void setCamera(int dt) {
 
 	glm::vec3 cameraNormal = glm::cross(direction, up);
 
-  // forward-backward
-  transformCamera = glm::translate(transformCamera, move.move*direction*0.5f);
-  // right-left
-  transformCamera = glm::translate(transformCamera, move.sidemove*cameraNormal*0.5f);
-  // up-down
-  transformCamera = glm::translate(transformCamera, move.fly*up*0.3f);
+    // forward-backward
+    transformCamera = glm::translate(transformCamera, move.move*direction*0.1f);
+    // right-left
+    transformCamera = glm::translate(transformCamera, move.sidemove*cameraNormal*0.1f);
+    // up-down
+    transformCamera = glm::translate(transformCamera, move.fly*up*0.1f);
 
-  // clk. ctr-clk . rotation
-  transformUp = glm::rotate(transformUp, move.rotate*0.1f, direction);
+    // clk. ctr-clk . rotation
+    transformUp = glm::rotate(transformUp, move.rotate*0.02f, direction);
 
-  // camera movement - left&right
-  transformDirection = glm::rotate(transformDirection, move.cam_right*-0.1f, up);
+    // camera movement - left&right
+    transformDirection = glm::rotate(transformDirection, move.cam_right*-0.01f, up);
 
-  // camera movement - up&down
-  transformDirection = glm::rotate(transformDirection, move.cam_up*0.1f, cameraNormal);
-  transformUp = glm::rotate(transformUp, move.cam_up*0.1f, cameraNormal);
+    // camera movement - up&down
+    transformDirection = glm::rotate(transformDirection, move.cam_up*0.01f, cameraNormal);
+    transformUp = glm::rotate(transformUp, move.cam_up*0.01f, cameraNormal);
 
+    // apply the transform matrices
 	camera = transformCamera * glm::vec4(camera, 1.0f);
 	direction = transformDirection * glm::vec4(direction, 1.0f);
 	up = transformUp * glm::vec4(up, 1.0f);

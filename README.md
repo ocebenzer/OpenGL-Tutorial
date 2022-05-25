@@ -1,8 +1,13 @@
-### cmpe460 project 3 OmerBenzer
+## cmpe460 project3 OmerBenzer
 
-Followed tutorial at: https://en.wikibooks.org/wiki/OpenGL_Programming#The_basics_arc
+First of all, I'd like to point out that this project is done by referencing the tutorials at: https://en.wikibooks.org/wiki/OpenGL_Programming#The_basics_arc
 
-### Installation (Ubuntu/Debian)
+* The common/shader_utils ([source](https://gitlab.com/wikibooks-opengl/modern-tutorials/-/tree/master/common)) stores the common glm functions to be used later
+* Similarly, I used the teapot data given in the tutorial above
+* You can use the keys described below to move around the world. Note that pressing too many buttons might cause buttons to stick, restart might be required.
+* The color of the teapot is a single variable "rgba" defined in main.cpp
+
+### Build (Ubuntu/Debian)
 
 * Install required packages
 ```
@@ -20,3 +25,11 @@ glxinfo | grep OpenGL
 make
 ./main
 ```
+### Movement control:
+* Use w-a-s-d for forward-left-backward-right movement
+* Use space to ascend
+* Use c/Ctrl/Shift to descend
+* Use arrow keys to look around
+* Use q-e to rotate the camera
+* Additionally, You can reset camera using r or exit using x
+For a graphic documentation of movement, see [movement documentation](documentation/README.md)
