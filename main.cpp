@@ -1,311 +1,158 @@
-/* Using standard C++ output libraries */
-#include <cstdlib>
-#include <iostream>
-using namespace std;
-
-/* Use glew.h instead of gl.h to get all the GL prototypes declared */
+/**
+ * From the OpenGL Programming wikibook: http://en.wikibooks.org/wiki/OpenGL_Programming
+ * This file is in the public domain.
+ * Contributors: Sylvain Beucler
+ */
+#include <stdio.h>
+#include <math.h>
 #include <GL/glew.h>
+
+#define GLM_FORCE_RADIANS
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-/* Using SDL2 for the base window and OpenGL context init */
-#include <SDL2/SDL.h>
-#include "SDL_image.h"
 
-// include, utility functions etc.
 #include "./common/shader_utils.h"
+#include "teapot.cpp"
+#include "camera.cpp"
 
-#define PI 3.141592653589f
+#define PI 3.1415926535f
 
-// global variables
 int screen_width=800, screen_height=600;
+GLuint vbo_teapot_vertices, ibo_teapot_elements;
 GLuint program;
-GLuint vbo_cube_vertices, vbo_cube_texcoords;
-GLuint ibo_cube_elements;
-GLuint texture_id;
-GLint attribute_coord3d, attribute_texcoord;
-GLint uniform_mvp, uniform_mytexture;
+GLint attribute_coord3d;
+GLint uniform_mvp, uniform_rgba;
 
-SDL_Renderer* renderer;
-SDL_Texture* res_texture;
+int currentTime, dt;
 
+glm::vec4 rgba(0.3, 0.3, 0.3, 1.0);
 
 bool init_resources() {
-	GLfloat cube_texcoords[2*4*6] = {
-		// front
-		0.0, 0.0,
-		1.0, 0.0,
-		1.0, 1.0,
-		0.0, 1.0,
-	};
-	for (int i = 1; i < 6; i++) {
-		memcpy(&cube_texcoords[i*4*2], &cube_texcoords[0], 2*4*sizeof(GLfloat));
-	}
-	glGenBuffers(1, &vbo_cube_texcoords);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_cube_texcoords);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(cube_texcoords), cube_texcoords, GL_STATIC_DRAW);
+    build_teapot();
 
-	GLfloat cube_vertices[] = {
-		// front
-		-1.0, -1.0,  1.0,
-		1.0, -1.0,  1.0,
-		1.0,  1.0,  1.0,
-		-1.0,  1.0,  1.0,
-		// top
-		-1.0,  1.0,  1.0,
-		1.0,  1.0,  1.0,
-		1.0,  1.0, -1.0,
-		-1.0,  1.0, -1.0,
-		// back
-		1.0, -1.0, -1.0,
-		-1.0, -1.0, -1.0,
-		-1.0,  1.0, -1.0,
-		1.0,  1.0, -1.0,
-		// bottom
-		-1.0, -1.0, -1.0,
-		1.0, -1.0, -1.0,
-		1.0, -1.0,  1.0,
-		-1.0, -1.0,  1.0,
-		// left
-		-1.0, -1.0, -1.0,
-		-1.0, -1.0,  1.0,
-		-1.0,  1.0,  1.0,
-		-1.0,  1.0, -1.0,
-		// right
-		1.0, -1.0,  1.0,
-		1.0, -1.0, -1.0,
-		1.0,  1.0, -1.0,
-		1.0,  1.0,  1.0,
-	};
-	glGenBuffers(1, &vbo_cube_vertices);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_cube_vertices);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
+    glGenBuffers(1, &vbo_teapot_vertices);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_teapot_vertices);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(teapot_vertices), teapot_vertices, GL_STATIC_DRAW);
 
-	GLushort cube_elements[] = {
-		// front
-		0,  1,  2,
-		2,  3,  0,
-		// top
-		4,  5,  6,
-		6,  7,  4,
-		// back
-		8,  9, 10,
-		10, 11,  8,
-		// bottom
-		12, 13, 14,
-		14, 15, 12,
-		// left
-		16, 17, 18,
-		18, 19, 16,
-		// right
-		20, 21, 22,
-		22, 23, 20,
-	};
-	glGenBuffers(1, &ibo_cube_elements);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_cube_elements);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_elements), cube_elements, GL_STATIC_DRAW);
+    glGenBuffers(1, &ibo_teapot_elements);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_teapot_elements);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(teapot_elements), teapot_elements, GL_STATIC_DRAW);
 
-	// shaders
-	GLint link_ok = GL_FALSE;
-	GLuint vs, fs;
-	if ((vs = create_shader("obj.v.glsl", GL_VERTEX_SHADER))   == 0) return false;
-	if ((fs = create_shader("obj.f.glsl", GL_FRAGMENT_SHADER)) == 0) return false;
-	
-	// textures
-	SDL_Surface* res_texture = IMG_Load("res_texture.png");
-	if (res_texture == NULL) {
-		cerr << "IMG_Load: " << SDL_GetError() << endl;
-		return false;
-	}
-	glGenTextures(1, &texture_id);
-	glBindTexture(GL_TEXTURE_2D, texture_id);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, // target
-		0, // level, 0 = base, no minimap,
-		GL_RGBA, // internalformat
-		res_texture->w, // width
-		res_texture->h, // height
-		0, // border, always 0 in OpenGL ES
-		GL_RGBA, // format
-		GL_UNSIGNED_BYTE, // type
-		res_texture->pixels);
-	SDL_FreeSurface(res_texture);
+    GLint link_ok = GL_FALSE;
 
+    GLuint vs, fs;
+    if ((vs = create_shader("obj.vs", GL_VERTEX_SHADER))   == 0) return 0;
+    if ((fs = create_shader("obj.fs", GL_FRAGMENT_SHADER)) == 0) return 0;
 
-	// apply resources
-	program = glCreateProgram();
+    program = glCreateProgram();
+    glAttachShader(program, vs);
+    glAttachShader(program, fs);
+    glLinkProgram(program);
+    glGetProgramiv(program, GL_LINK_STATUS, &link_ok);
+    if (!link_ok) {
+        fprintf(stderr, "glLinkProgram:");
+        print_log(program);
+        return false;
+    }
 
-	glAttachShader(program, vs);
-	glAttachShader(program, fs);
-	glLinkProgram(program);
-	glGetProgramiv(program, GL_LINK_STATUS, &link_ok);
-	if (!link_ok) {
-		cerr << "glLinkProgram:";
-		print_log(program);
-		return false;
-	}
-	
-	const char* attribute_name = "coord3d";
-	attribute_coord3d = glGetAttribLocation(program, attribute_name);
-	if (attribute_coord3d == -1) {
-		cerr << "Could not bind attribute " << attribute_name << endl;
-		return false;
-	}
+    attribute_coord3d = get_attrib(program, "coord3d");
+    uniform_mvp = get_uniform(program, "mvp");
+    uniform_rgba = get_uniform(program, "rgba");
 
-	const char* uniform_name;
-	uniform_name = "mvp";
-	uniform_mvp = glGetUniformLocation(program, uniform_name);
-	if (uniform_mvp == -1) {
-		fprintf(stderr, "Could not bind uniform %s\n", uniform_name);
-		return 0;
-	}
-
-	attribute_name = "texcoord";
-	attribute_texcoord = glGetAttribLocation(program, attribute_name);
-	if (attribute_texcoord == -1) {
-		cerr << "Could not bind attribute " << attribute_name << endl;
-		return false;
-	}
-	
-	return true;
+    return true;
 }
 
-void render(SDL_Window* window) {
-	glClearColor(1.0, 1.0, 1.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-	
-	glUseProgram(program);
+void onIdle() { // logic goes here
+    int currentTime = glutGet(GLUT_ELAPSED_TIME);
+    dt = currentTime - currentTime;
+    currentTime = currentTime;
 
-	glActiveTexture(GL_TEXTURE0);
-	glUniform1i(uniform_mytexture, /*GL_TEXTURE*/0);
-	glBindTexture(GL_TEXTURE_2D, texture_id);
+    setCamera(dt);
 
-	glEnableVertexAttribArray(attribute_coord3d);
-	// Describe our vertices array to OpenGL (it can't guess its format automatically)
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_cube_vertices);
-	glVertexAttribPointer(
-		  attribute_coord3d, // attribute
-		  3,                 // number of elements per vertex, here (x,y,z)
-		  GL_FLOAT,          // the type of each element
-		  GL_FALSE,          // take our values as-is
-		  0,                 // no extra data between each position
-		  0                  // offset of first element
-	);
+    glm::mat4 model = glm::rotate(glm::mat4(1.0f), PI/2, glm::vec3(-1.0f, 0.0f, 0.0f));
+    glm::mat4 view = glm::lookAt(camera, direction+camera, up);
+    glm::mat4 projection = glm::perspective(45.0f, 1.0f*screen_width/screen_height, 0.1f, 10.0f);
 
-	glEnableVertexAttribArray(attribute_texcoord);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_cube_texcoords);
-	glVertexAttribPointer(
-		attribute_texcoord, // attribute
-		2,                  // number of elements per vertex, here (x,y)
-		GL_FLOAT,           // the type of each element
-		GL_FALSE,           // take our values as-is
-		0,                  // no extra data between each position
-		0                   // offset of first element
-	);
+    glm::mat4 mvp = projection * view * model;
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_cube_elements);
-	int size;  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-	glDrawElements(GL_TRIANGLES, size/sizeof(GLushort), GL_UNSIGNED_SHORT, 0);
-
-	glDisableVertexAttribArray(attribute_coord3d);
-	glDisableVertexAttribArray(attribute_texcoord);
-	SDL_GL_SwapWindow(window);
+    glUseProgram(program);
+    glUniformMatrix4fv(uniform_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
+    glUniform4fv(uniform_rgba, 1, glm::value_ptr(rgba));
+    glutPostRedisplay();
 }
 
-void onResize(int width, int height) {
-  screen_width = width;
-  screen_height = height;
-  glViewport(0, 0, screen_width, screen_height);
+void onDisplay() { // calculate per frame
+    glClearColor(1.0, 1.0, 1.0, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
+    // Draw Teapot
+    glUseProgram(program);
+    glEnableVertexAttribArray(attribute_coord3d);
+    // Describe our vertices array to OpenGL (it can't guess its format automatically)
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_teapot_vertices);
+    glVertexAttribPointer(
+        attribute_coord3d, // attribute
+        3,                 // number of elements per vertex, here (x,y,z)
+        GL_FLOAT,          // the type of each element
+        GL_FALSE,          // take our values as-is
+        0,                 // no extra data between each position
+        0                  // offset of first element
+    );
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_teapot_elements);
+    glDrawElements(GL_TRIANGLES, sizeof(teapot_elements)/sizeof(teapot_elements[0]), GL_UNSIGNED_SHORT, 0);
+
+    glDisableVertexAttribArray(attribute_coord3d);
+    glutSwapBuffers();
+}
+
+void onReshape(int width, int height) {
+    screen_width = width;
+    screen_height = height;
+    glViewport(0, 0, screen_width, screen_height);
 }
 
 void free_resources() {
-	glDeleteProgram(program);
-	glDeleteBuffers(1, &vbo_cube_vertices);
-	glDeleteBuffers(1, &vbo_cube_texcoords);
-	glDeleteBuffers(1, &ibo_cube_elements);
-	glDeleteTextures(1, &texture_id);
+    glDeleteProgram(program);
+    glDeleteBuffers(1, &vbo_teapot_vertices);
+    glDeleteBuffers(1, &ibo_teapot_elements);
 }
 
-void logic() {
-	// mvp projection matrix
-	glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0, -4.0));
-	glm::mat4 view = glm::lookAt(glm::vec3(0.0, 2.0, 0.0), glm::vec3(0.0, 0.0, -4.0), glm::vec3(0.0, 1.0, 0.0));
-	glm::mat4 projection = glm::perspective(45.0f, 1.0f * screen_width / screen_height, 0.1f, 10.0f);
-
-	float angle = SDL_GetTicks() / 1000.0 * 15;  // base 15° per second
-	glm::mat4 anim = \
-    glm::rotate(glm::mat4(1.0f), glm::radians(angle)*3.0f, glm::vec3(1, 0, 0)) *  // X axis
-    glm::rotate(glm::mat4(1.0f), glm::radians(angle)*2.0f, glm::vec3(0, 1, 0)) *  // Y axis
-    glm::rotate(glm::mat4(1.0f), glm::radians(angle)*4.0f, glm::vec3(0, 0, 1));   // Z axis
-
-	glm::mat4 mvp = projection * view * model * anim;
-  	glUniformMatrix4fv(uniform_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
-}
-
-void mainLoop(SDL_Window* window) {
-	while (true) {
-		SDL_Event ev;
-		while (SDL_PollEvent(&ev)) {
-			if (ev.type == SDL_WINDOWEVENT && ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
-				onResize(ev.window.data1, ev.window.data2);
-			if (ev.type == SDL_QUIT)
-				return;
-		}
-		logic();
-		render(window);
-	}
-}
 
 int main(int argc, char* argv[]) {
-	/* SDL-related initialising functions */
-	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window* window = SDL_CreateWindow("My Textured Cube",
-		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		screen_width, screen_height,
-		SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
-	if (window == NULL) {
-		cerr << "Error: can't create window: " << SDL_GetError() << endl;
-		return EXIT_FAILURE;
-	}
+    glutInit(&argc, argv);
+    glutInitContextVersion(2,0);
+    glutInitDisplayMode(GLUT_RGBA|GLUT_ALPHA|GLUT_DOUBLE|GLUT_DEPTH);
+    glutInitWindowSize(screen_width, screen_height);
+    glutCreateWindow("My unicolor teapot w/ movement");
 
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-	//SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
-	//SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 1);
-	if (SDL_GL_CreateContext(window) == NULL) {
-		cerr << "Error: SDL_GL_CreateContext: " << SDL_GetError() << endl;
-		return EXIT_FAILURE;
-	}
+    GLenum glew_status = glewInit();
+    if (glew_status != GLEW_OK) {
+        fprintf(stderr, "Error: %s\n", glewGetErrorString(glew_status));
+        return 1;
+    }
 
-	/* Extension wrangler initialising */
-	GLenum glew_status = glewInit();
-	if (glew_status != GLEW_OK) {
-		cerr << "Error: glewInit: " << glewGetErrorString(glew_status) << endl;
-		return EXIT_FAILURE;
-	}
+    if (!GLEW_VERSION_2_0) {
+        fprintf(stderr, "Error: your graphic card does not support OpenGL 2.0\n");
+        return 1;
+    }
 
-	if (!GLEW_VERSION_2_0) {
-		cerr << "Error: your graphic card does not support OpenGL 2.0" << endl;
-		return EXIT_FAILURE;
-	}
+    if (init_resources()) {
+        glutDisplayFunc(onDisplay);
+        glutReshapeFunc(onReshape);
+        glutIdleFunc(onIdle);
+        glutKeyboardFunc(onKeyboard);
+        glutKeyboardUpFunc(onKeyboardUp);
+        glutSpecialFunc(onSpecial);
+        glutSpecialUpFunc(onSpecialUp);
+        glFrustum(-1000, 1000, -1000, 1000, -1000, 1000);
+        glEnable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glutMainLoop();
+    }
 
-	/* When all init functions run without errors,
-	   the program can initialise the resources */
-	if (!init_resources())
-		return EXIT_FAILURE;
-
-	// Enable depth test
-	glEnable(GL_DEPTH_TEST);
-	// Enable alpha
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	/* We can display something if everything goes OK */
-	mainLoop(window);
-
-	/* If the program exits in the usual way,
-	   free resources and exit with a success */
-	free_resources();
-	return EXIT_SUCCESS;
+    free_resources();
+    return 0;
 }
-
